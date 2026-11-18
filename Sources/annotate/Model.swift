@@ -26,6 +26,9 @@ struct Annotation {
     var dim: CGFloat
     var pinned: Bool
     var expiresAt: Date?
+    var task = false             // show a clickable "✓ Done" button
+    var doneText = "Done"
+    var dismissible = true       // show a clickable "✕" button
 
     private func r(_ v: CGFloat) -> Double { (Double(v) * 10).rounded() / 10 }
 
@@ -44,6 +47,7 @@ struct Annotation {
         }
         if let t = text { d["text"] = t }
         if let c = caption { d["label"] = c }
+        if task { d["task"] = true }
         if let e = expiresAt { d["expires_in_seconds"] = max(0, Int(e.timeIntervalSinceNow.rounded())) }
         return d
     }
@@ -112,6 +116,9 @@ enum ShapeParser {
                 pinned: pinned,
                 expiresAt: duration.flatMap { $0 > 0 ? Date().addingTimeInterval($0) : nil }
             )
+            a.task = bool(s, "task") ?? false
+            if let dt = str(s, "done_text"), !dt.isEmpty { a.doneText = dt; a.task = bool(s, "task") ?? true }
+            a.dismissible = bool(s, "dismissible") ?? true
             if kind == .highlight, s["color"] == nil, s["urgency"] == nil {
                 a.color = Palette.hex("#FFD60A")!
             }

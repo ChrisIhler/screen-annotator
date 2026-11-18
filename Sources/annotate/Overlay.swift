@@ -141,7 +141,7 @@ enum Renderer {
 
     // Label pills
 
-    private static func pill(_ text: String, _ a: Annotation) -> (NSAttributedString, CGSize) {
+    static func pill(_ text: String, _ a: Annotation) -> (NSAttributedString, CGSize) {
         let str = NSAttributedString(string: text, attributes: [
             .font: NSFont.systemFont(ofSize: a.fontSize, weight: .bold),
             .foregroundColor: textColor(on: a.color),
@@ -162,7 +162,7 @@ enum Renderer {
         str.draw(at: CGPoint(x: r.midX - s.width / 2, y: r.midY - s.height / 2))
     }
 
-    private static func captionRect(for a: Annotation, size: CGSize, bounds: CGRect) -> CGRect {
+    static func captionRect(for a: Annotation, size: CGSize, bounds: CGRect) -> CGRect {
         let gap: CGFloat = 8
         if a.kind == .arrow {
             // Put the caption at the arrow's tail, pushed away from the head.
@@ -178,7 +178,7 @@ enum Renderer {
         return clamp(r, to: bounds)
     }
 
-    private static func clamp(_ r: CGRect, to b: CGRect) -> CGRect {
+    static func clamp(_ r: CGRect, to b: CGRect) -> CGRect {
         var o = r.origin
         o.x = min(max(o.x, b.minX + 4), b.maxX - r.width - 4)
         o.y = min(max(o.y, b.minY + 4), b.maxY - r.height - 4)
@@ -201,6 +201,9 @@ final class Overlay {
     private(set) var annotations: [Annotation] = []
     private var displayWindows: [CGDirectDisplayID: OverlayWindow] = [:]
     private var pinnedWindows: [Int: OverlayWindow] = [:]   // keyed by uid
+    private var controlPanels: [Int: ControlPanel] = [:]    // keyed by uid
+    private(set) var events: [ClickEvent] = []
+    private var nextSeq = 0
     var onChange: (() -> Void)?
 
     func add(_ list: [Annotation]) {
@@ -220,6 +223,7 @@ final class Overlay {
             }
         }
         refresh()
+        rebuildControls()
     }
 
     /// Remove matching annotations; returns how many were removed.
@@ -232,6 +236,7 @@ final class Overlay {
             if let w = pinnedWindows.removeValue(forKey: a.uid) { w.orderOut(nil); w.close() }
         }
         refresh()
+        rebuildControls()
         return gone.count
     }
 
@@ -265,5 +270,84 @@ final class Overlay {
             }
         }
         refresh()
+        rebuildControls()
+    }
+
+    // MARK: Clickable controls
+
+    /// One button strip per (id, display): the first annotation of a group
+    /// carries it, so a multi-shape action gets a single Done button.
+    private func rebuildControls() {
+        var wanted: [Int: Annotation] = [:]
+        var seen = Set<String>()
+        for a in annotations where a.task || a.dismissible {
+            let key = "\(a.id)|\(a.displayID)"
+            if seen.insert(key).inserted { wanted[a.uid] = a }
+        }
+        for (uid, p) in controlPanels where wanted[uid] == nil {
+            p.orderOut(nil); p.close(); controlPanels[uid] = nil
+        }
+        for (uid, a) in wanted where controlPanels[uid] == nil {
+            guard let screen = Displays.screen(for: a.displayID) else { continue }
+            let view = ControlsView()
+            var specs: [(String, NSColor, NSColor, () -> Void)] = []
+            let id = a.id, did = a.displayID
+            if a.task {
+                specs.append(("✓ \(a.doneText)", Palette.hex("#34C759")!, .white, { [weak self] in
+                    self?.clicked(id: id, displayID: did, action: "done")
+                }))
+            }
+            if a.dismissible {
+                specs.append(("✕", NSColor(white: 0.15, alpha: 0.85), .white, { [weak self] in
+                    self?.clicked(id: id, displayID: did, action: "dismissed")
+                }))
+            }
+            let size = view.configure(specs)
+            let local = Renderer.controlsRect(for: a, size: size, bounds: CGRect(origin: .zero, size: screen.frame.size))
+            let global = CGRect(x: screen.frame.minX + local.minX, y: screen.frame.maxY - local.maxY,
+                                width: size.width, height: size.height)
+            let panel = ControlPanel(frame: global, allSpaces: !a.pinned, content: view)
+            view.frame = CGRect(origin: .zero, size: size)
+            panel.orderFrontRegardless()
+            controlPanels[uid] = panel
+        }
+    }
+
+    private func clicked(id: String, displayID: CGDirectDisplayID, action: String) {
+        let group = annotations.filter { $0.id == id && $0.displayID == displayID }
+        guard let first = group.first else { return }
+        nextSeq += 1
+        events.append(ClickEvent(seq: nextSeq, id: id, action: action, display: first.displayName,
+                                 label: first.caption ?? first.text, at: Date()))
+        if events.count > 500 { events.removeFirst(events.count - 500) }
+
+        if action == "done" {
+            // Brief green "✓ Done" confirmation, then remove.
+            let uids = Set(group.map(\.uid))
+            for i in annotations.indices where uids.contains(annotations[i].uid) {
+                annotations[i].color = Palette.hex("#34C759")!
+                if annotations[i].kind == .label { annotations[i].text = "✓ \(first.doneText)" }
+                else { annotations[i].caption = "✓ \(first.doneText)" }
+                annotations[i].task = false
+                annotations[i].dismissible = false
+            }
+            for (uid, w) in pinnedWindows where uids.contains(uid) {
+                w.view.items = annotations.filter { $0.uid == uid }
+            }
+            refresh()
+            rebuildControls()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+                self?.remove { uids.contains($0.uid) }
+            }
+        } else {
+            remove { $0.id == id && $0.displayID == displayID }
+        }
+    }
+
+    /// Return (and by default consume) the oldest unread click, optionally for one id.
+    func takeEvent(id: String?, consume: Bool) -> ClickEvent? {
+        guard let i = events.firstIndex(where: { !$0.consumed && (id == nil || $0.id == id) }) else { return nil }
+        if consume { events[i].consumed = true }
+        return events[i]
     }
 }

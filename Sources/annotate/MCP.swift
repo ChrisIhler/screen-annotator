@@ -9,7 +9,9 @@ enum MCPServer {
     to learn each display's name, position (e.g. upper-left) and size. Coordinates are in points \
     from the top-left corner of the chosen display unless units says otherwise: units="fraction" \
     takes 0-1 values (best when working from a scaled screenshot), units="pixels" takes physical \
-    pixels (Retina screenshots). Use urgency (urgent=🔴 red, soon=🟡 yellow, fyi=🔵 blue) to color-code \
+    pixels (Retina screenshots). Every mark gets a small clickable ✕ so the user can dismiss it; \
+    add task=true (or done_text) to also show a "✓ Done" button, then call wait_for_click to learn when \
+    the user finished that step and continue. Use urgency (urgent=🔴 red, soon=🟡 yellow, fyi=🔵 blue) to color-code \
     numbered actions. Annotations stay until cleared unless duration_seconds is set. Always clear \
     annotations when you are done pointing at things.
     """
@@ -52,6 +54,7 @@ enum MCPServer {
     }
 
     private static func call(_ name: String, _ args: [String: Any]) -> [String: Any] {
+        if name == "wait_for_click" { return waitForClick(args) }
         guard let req = Tools.request(for: name, args) else {
             return toolText("Unknown tool '\(name)'.", isError: true)
         }
@@ -63,6 +66,27 @@ enum MCPServer {
                 ? String(data: (try? JSONSerialization.data(withJSONObject: body, options: [.prettyPrinted, .sortedKeys])) ?? Data(), encoding: .utf8) ?? "ok"
                 : "Error: \(resp["error"] ?? "unknown error")"
             return toolText(text, isError: !ok)
+        } catch {
+            return toolText("Error: \(error)", isError: true)
+        }
+    }
+
+    private static func waitForClick(_ args: [String: Any]) -> [String: Any] {
+        let timeout = min(max(ShapeParser.num(args, "timeout_seconds") ?? 120, 0), 600)
+        var req: [String: Any] = ["cmd": "events"]
+        if let id = args["id"] as? String, !id.isEmpty { req["id"] = id }
+        let deadline = Date().addingTimeInterval(timeout)
+        do {
+            repeat {
+                let resp = try Client.request(req)
+                if let e = resp["event"] as? [String: Any] {
+                    let d = try JSONSerialization.data(withJSONObject: ["clicked": e], options: [.prettyPrinted, .sortedKeys])
+                    return toolText(String(data: d, encoding: .utf8) ?? "", isError: false)
+                }
+                if Date() >= deadline { break }
+                usleep(300_000)
+            } while true
+            return toolText("{\n  \"clicked\" : null,\n  \"note\" : \"No click within \(Int(timeout)) s. The annotation is still on screen; call wait_for_click again or clear it.\"\n}", isError: false)
         } catch {
             return toolText("Error: \(error)", isError: true)
         }
@@ -102,6 +126,9 @@ enum Tools {
         "duration_seconds": n("Auto-clear after this many seconds. Omit to keep until cleared."),
         "pin_to_current_space": ["type": "boolean", "description": "true = show only on the macOS desktop (Space) that is active right now. Default false = visible on every desktop."],
         "clear_first": ["type": "boolean", "description": "Clear existing annotations on the target display(s) before drawing."],
+        "task": ["type": "boolean", "description": "Add a clickable \"✓ Done\" button so the user can mark this step complete. Then call wait_for_click to find out when they did."],
+        "done_text": s("Text for the Done button, e.g. \"Task complete\". Implies task=true."),
+        "dismissible": ["type": "boolean", "description": "Show a small clickable ✕ so the user can remove the mark. Default true."],
     ]
 
     private static func tool(_ name: String, _ desc: String, _ props: [String: Any], required: [String], withCommon: Bool = true) -> [String: Any] {
@@ -151,6 +178,10 @@ enum Tools {
             tool("clear", "Remove annotations. No arguments = clear everything. Give id and/or display to clear selectively.", [
                 "id": s("Only clear annotations with this id."),
                 "display": s("Only clear this display (same selectors as drawing)."),
+            ], required: [], withCommon: false),
+            tool("wait_for_click", "Wait until the user clicks an annotation's ✓ Done or ✕ button, then return what they clicked (id, action \"done\" or \"dismissed\"). Each click is returned once. Use timeout_seconds=0 to just check without waiting.", [
+                "id": s("Only wait for clicks on this annotation id."),
+                "timeout_seconds": n("How long to wait. Default 120, max 600."),
             ], required: [], withCommon: false),
             tool("list_annotations", "List annotations currently on screen.", [:], required: [], withCommon: false),
         ]

@@ -10,6 +10,7 @@ USAGE
   annotate <shape> key=value ...     Draw a shape (see below)
   annotate clear [display=..] [id=..]  Clear annotations (all by default)
   annotate list                      List annotations on screen
+  annotate wait [id=..] [timeout=120]  Wait for a click on a ✓ Done / ✕ button
   annotate demo [display=right]      Draw a sample set for 10 seconds
   annotate json '<request>'          Send a raw JSON request to the daemon
   annotate quit                      Stop the overlay daemon
@@ -28,6 +29,8 @@ COMMON OPTIONS
   units=points|pixels|fraction   color=red|#FF8800   urgency=urgent|soon|fyi
   label="Action 1"   id=name   line_width=5   duration_seconds=10
   pin_to_current_space=true   clear_first=true
+  task=true (adds a clickable "✓ Done" button)   done_text="Task complete"
+  dismissible=false (hide the clickable ✕)
 
 EXAMPLES
   annotate circle display=HDR x=600 y=400 radius=80 urgency=urgent label="Action 1"
@@ -87,6 +90,18 @@ case "ping", "status":
     do { printJSON(try Client.request(["cmd": "ping"], autostart: false)) }
     catch { print("annotate: daemon is not running."); exit(1) }
     exit(0)
+case "wait":
+    // Poll for the next button click (CLI equivalent of wait_for_click).
+    let o = parseKV(rest)
+    let timeout = ShapeParser.num(o, "timeout") ?? ShapeParser.num(o, "timeout_seconds") ?? 120
+    var req: [String: Any] = ["cmd": "events"]
+    if let id = ShapeParser.str(o, "id") { req["id"] = id }
+    let deadline = Date().addingTimeInterval(timeout)
+    while true {
+        if let r = try? Client.request(req), let e = r["event"] as? [String: Any] { printJSON(e); exit(0) }
+        if Date() >= deadline { print("{\"clicked\": null}"); exit(1) }
+        usleep(300_000)
+    }
 case "json":
     guard let raw = rest.first, let d = raw.data(using: .utf8),
           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {

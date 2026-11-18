@@ -23,11 +23,18 @@ enum Commands {
                 return try clear(req)
             case "list", "list_annotations":
                 return ["ok": true, "annotations": Overlay.shared.annotations.map(\.summary)]
+            case "events", "take_event":
+                let id = (req["id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                let consume = ShapeParser.bool(req, "consume") ?? true
+                if let e = Overlay.shared.takeEvent(id: id, consume: consume) {
+                    return ["ok": true, "event": e.json]
+                }
+                return ["ok": true, "event": NSNull()]
             case "quit":
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { NSApp.terminate(nil) }
                 return ["ok": true, "message": "Overlay daemon is quitting."]
             default:
-                throw AnnotatorError("Unknown cmd '\(cmd)'. Use ping, list_displays, draw, clear, list or quit.")
+                throw AnnotatorError("Unknown cmd '\(cmd)'. Use ping, list_displays, draw, clear, list, events or quit.")
             }
         } catch {
             return ["ok": false, "error": "\(error)"]

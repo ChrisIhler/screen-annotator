@@ -106,6 +106,21 @@ Options for every shape:
 | `duration_seconds` | Clear automatically after this long |
 | `pin_to_current_space` | Show only on the desktop (Space) that is active now. Default: visible on all desktops |
 | `clear_first` | Wipe the target display before drawing |
+| `task` | Add a clickable **✓ Done** button (green) next to the mark |
+| `done_text` | Custom Done button text, e.g. `"Task complete"` (implies `task`) |
+| `dismissible` | Show the small clickable **✕** (default `true`) |
+
+## Clickable buttons
+
+The overlay is click-through, with one exception: each mark gets a small button strip next to its label.
+
+- **✕** removes the mark.
+- **✓ Done** (only when `task` or `done_text` is set) flashes the mark green, then removes it.
+
+Both buttons are non-activating panels, so clicking them never pulls focus away from the app you're in.
+Every click is recorded, and an assistant can pick it up with the `wait_for_click` MCP tool
+(or `annotate wait` on the command line), so it can show step 1, wait for you to press Done, then move on to step 2.
+Shapes that share an `id` on the same display get a single button strip.
 
 ## CLI examples
 
@@ -114,6 +129,8 @@ annotate circle display=HDR x=600 y=400 radius=80 urgency=urgent label="Action 1
 annotate arrow  display=left units=fraction from_x=0.2 from_y=0.2 to_x=0.5 to_y=0.5 urgency=soon label="Action 2"
 annotate highlight display=built-in x=100 y=200 width=500 height=40
 annotate marker display=right x=900 y=300 number=3
+annotate marker display=HDR x=500 y=300 number=1 urgency=urgent label="Click Save" done_text="Task complete" id=step1
+annotate wait id=step1 timeout=300   # prints {"action":"done",...} when you press it
 annotate list
 annotate clear                     # everything
 annotate clear display=HDR         # one display
@@ -131,9 +148,10 @@ annotate quit                      # stop the overlay
 | `annotate` | Draw several shapes in one call (shared options at the top level) |
 | `clear` | Clear all, or by `id` / `display` |
 | `list_annotations` | What is on screen now |
+| `wait_for_click` | Wait for (or, with `timeout_seconds: 0`, just check) a click on ✓ Done or ✕ |
 
 A typical flow for an assistant: take a screenshot, call `list_displays`, draw with `units: "fraction"`
-(so screenshot scaling doesn't matter), explain the numbered steps in chat, then `clear`.
+(so screenshot scaling doesn't matter) with `task: true`, call `wait_for_click`, and continue once the user presses Done.
 
 ## Desktops (Spaces)
 
@@ -164,6 +182,7 @@ Sources/annotate/
   Client.swift    socket client, daemon auto-start
   Daemon.swift    socket server, command handling, menu bar item
   Overlay.swift   overlay windows and drawing
+  Controls.swift  clickable ✓ Done / ✕ buttons and click events
   Model.swift     shape parsing, units, colors
   Displays.swift  display discovery and selectors
 ```
