@@ -1,0 +1,17 @@
+name: build
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build universal binary
+        run: swift build -c release --arch arm64 --arch x86_64
+      - name: Smoke test
+        run: |
+          BIN=$(ls .build/out/Products/Release/annotate .build/apple/Products/Release/annotate 2>/dev/null | head -1)
+          lipo -archs "$BIN"
+          "$BIN" --version
+          printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}' '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | "$BIN" mcp | grep -q wait_for_click

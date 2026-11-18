@@ -18,8 +18,22 @@ Requires macOS 13 or later. No third-party dependencies.
 
 ## Install
 
+### As a Claude Code plugin (easiest)
+
+```
+/plugin install screen-annotator --marketplace ChrisIhler/screen-annotator
+```
+
+This bundles a prebuilt universal binary, the MCP server and a skill that teaches Claude how to point at things.
+
+### Claude Desktop
+
+Download `screen-annotator.mcpb` from the Releases page and double-click it.
+
+### From source
+
 ```bash
-git clone <this repo> screen-annotator && cd screen-annotator
+git clone https://github.com/ChrisIhler/screen-annotator.git && cd screen-annotator
 ./scripts/install.sh          # builds and installs ~/.local/bin/annotate
 ```
 

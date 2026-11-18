@@ -1,0 +1,15 @@
+{
+  "name": "screen-annotator",
+  "description": "Screen Annotator: let Claude draw on your Mac's screens and walk you through tasks step by step.",
+  "owner": {
+    "name": "Chris Ihler"
+  },
+  "plugins": [
+    {
+      "name": "screen-annotator",
+      "source": "./",
+      "description": "Draw annotations over your Mac's screens from Claude, with clickable Done buttons.",
+      "version": "0.2.0"
+    }
+  ]
+}

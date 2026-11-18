@@ -1,7 +1,7 @@
 import AppKit
 import Darwin
 
-let annotatorVersion = "0.1.0"
+let annotatorVersion = "0.2.0"
 
 /// Path of the local control socket. Only the current user can connect (0600).
 let socketPath = "/tmp/screen-annotator-\(getuid()).sock"

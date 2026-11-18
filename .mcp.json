@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "screen-annotator": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/annotate-launcher.sh",
+      "args": ["mcp"]
+    }
+  }
+}
