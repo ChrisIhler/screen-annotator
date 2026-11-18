@@ -106,7 +106,7 @@ final class Guides {
         }
     }
 
-    func cancelAll() { for k in Array(guides.keys) { cancel(k, record: false) } }
+    func cancelAll(record: Bool = false) { for k in Array(guides.keys) { cancel(k, record: record) } }
 
     var status: [[String: Any]] {
         guides.values.map { ["id": $0.id, "step": $0.index + 1, "of": $0.steps.count] }

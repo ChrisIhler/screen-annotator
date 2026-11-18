@@ -16,7 +16,10 @@ USAGE
   annotate tutorial                  Interactive 1-minute walkthrough (start here)
   annotate demo [display=right]      Draw a sample set for 10 seconds
   annotate json '<request>'          Send a raw JSON request to the daemon
+  annotate login on|off|status       Start the overlay automatically at login
   annotate quit                      Stop the overlay daemon
+
+  Shortcut: ⌃⌥⌘C clears every mark (also in the pencil menu-bar icon).
 
 SHAPES
   circle     x y radius            (center)  — or x y width height (box to circle)
@@ -123,6 +126,18 @@ case "tutorial", "welcome", "setup":
     let o = parseKV(rest)
     let r = Tutorial.run(display: ShapeParser.str(o, "display") ?? "mouse") { print($0) }
     exit(r.completed ? 0 : 1)
+case "login":
+    // annotate login on|off|status
+    let arg = rest.first?.lowercased() ?? "status"
+    do {
+        switch arg {
+        case "on", "enable": try LoginItem.enable()
+        case "off", "disable": try LoginItem.disable()
+        default: break
+        }
+        print(LoginItem.isEnabled ? "Start at login: on (\(LoginItem.plistURL.path))" : "Start at login: off")
+        exit(0)
+    } catch { print("annotate: \(error)"); exit(1) }
 case "json":
     guard let raw = rest.first, let d = raw.data(using: .utf8),
           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {

@@ -1,7 +1,7 @@
 import AppKit
 import Darwin
 
-let annotatorVersion = "0.3.0"
+let annotatorVersion = "0.4.0"
 
 /// Path of the local control socket. Only the current user can connect (0600).
 let socketPath = "/tmp/screen-annotator-\(getuid()).sock"
@@ -35,6 +35,13 @@ enum Commands {
                         "note": "Window titles appear only if this app has Screen Recording permission; app names always do."]
             case "guide":
                 return try Guides.shared.start(req)
+            case "login_item":
+                let v = (req["enabled"] as? Bool)
+                if v == true { try LoginItem.enable() } else if v == false { try LoginItem.disable() }
+                return ["ok": true, "start_at_login": LoginItem.isEnabled]
+            case "_simulate_clear_all":   // used by the test suite
+                Overlay.shared.userClearAll()
+                return ["ok": true]
             case "_simulate_click":   // used by the test suite
                 guard let id = req["id"] as? String,
                       let a = Overlay.shared.annotations.first(where: { $0.id == id }) else {
@@ -168,6 +175,7 @@ func makeAddr(_ path: String) -> sockaddr_un {
 final class DaemonDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private let countItem = NSMenuItem(title: "No annotations", action: nil, keyEquivalent: "")
+    private lazy var loginItem = NSMenuItem(title: "Start at login", action: #selector(toggleLogin), keyEquivalent: "")
     private let server = SocketServer()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -187,7 +195,10 @@ final class DaemonDelegate: NSObject, NSApplicationDelegate {
         countItem.isEnabled = false
         menu.addItem(countItem)
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Clear all annotations", action: #selector(clearAll), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Clear all annotations   \(Hotkey.display)", action: #selector(clearAll), keyEquivalent: "").target = self
+        loginItem.target = self
+        loginItem.state = LoginItem.isEnabled ? .on : .off
+        menu.addItem(loginItem)
         menu.addItem(withTitle: "Quit Screen Annotator", action: #selector(quit), keyEquivalent: "").target = self
         item.menu = menu
         statusItem = item
@@ -197,6 +208,8 @@ final class DaemonDelegate: NSObject, NSApplicationDelegate {
             self?.countItem.title = n == 0 ? "No annotations" : "\(n) annotation\(n == 1 ? "" : "s") on screen"
         }
 
+        Hotkey.register { Overlay.shared.userClearAll() }
+
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { _ in Overlay.shared.screensChanged() }
@@ -204,7 +217,11 @@ final class DaemonDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) { unlink(socketPath) }
 
-    @objc private func clearAll() { Guides.shared.cancelAll(); Overlay.shared.remove { _ in true } }
+    @objc private func clearAll() { Overlay.shared.userClearAll() }
+    @objc private func toggleLogin() {
+        do { if LoginItem.isEnabled { try LoginItem.disable() } else { try LoginItem.enable() } } catch { NSSound.beep() }
+        loginItem.state = LoginItem.isEnabled ? .on : .off
+    }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 

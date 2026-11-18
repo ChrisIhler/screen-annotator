@@ -26,8 +26,9 @@ final class OverlayWindow: NSWindow {
 }
 
 final class OverlayView: NSView {
-    var items: [Annotation] = [] { didSet { needsDisplay = true } }
+    var items: [Annotation] = [] { didSet { needsDisplay = true; animateIfNeeded() } }
     override var isFlipped: Bool { true }   // top-left origin, matches screenshots
+    private var animTimer: Timer?
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.set()
@@ -35,12 +36,62 @@ final class OverlayView: NSView {
         // Spotlights first so other marks sit on top of the dimming.
         for a in items where a.kind == .spotlight { Renderer.draw(a, bounds: bounds) }
         for a in items where a.kind != .spotlight { Renderer.draw(a, bounds: bounds) }
+        for a in items { Renderer.drawPulse(a, bounds: bounds) }
+    }
+
+    /// Redraw at ~30 fps while any mark is pulsing.
+    private func animateIfNeeded() {
+        let pulsing = items.contains { Renderer.isPulsing($0) }
+        if pulsing && animTimer == nil {
+            let t = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                self.needsDisplay = true
+                if !self.items.contains(where: { Renderer.isPulsing($0) }) {
+                    self.animTimer?.invalidate(); self.animTimer = nil
+                }
+            }
+            RunLoop.main.add(t, forMode: .common)
+            animTimer = t
+        }
     }
 }
 
 // MARK: - Drawing
 
 enum Renderer {
+    static let pulseDuration: TimeInterval = 1.4
+
+    static func isPulsing(_ a: Annotation) -> Bool {
+        guard let s = a.pulseStart else { return false }
+        return Date().timeIntervalSince(s) < pulseDuration
+    }
+
+    /// Two expanding, fading rings around a new mark so the eye finds it.
+    static func drawPulse(_ a: Annotation, bounds: CGRect) {
+        guard let start = a.pulseStart else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed < pulseDuration else { return }
+        let target: CGRect
+        switch a.kind {
+        case .arrow: target = CGRect(x: a.to.x - 18, y: a.to.y - 18, width: 36, height: 36)
+        case .label: target = CGRect(origin: a.from, size: pill(a.text ?? "", a).1)
+        default: target = a.rect
+        }
+        let period = pulseDuration / 2
+        for k in 0..<2 {
+            let t = (elapsed - Double(k) * period * 0.6) / period
+            guard t >= 0, t <= 1 else { continue }
+            let grow = CGFloat(t) * 36
+            let r = target.insetBy(dx: -grow - 4, dy: -grow - 4)
+            let p = a.kind == .circle || a.kind == .marker || a.kind == .arrow
+                ? NSBezierPath(ovalIn: r)
+                : NSBezierPath(roundedRect: r, xRadius: a.cornerRadius + grow / 2, yRadius: a.cornerRadius + grow / 2)
+            a.color.withAlphaComponent(0.85 * (1 - CGFloat(t))).setStroke()
+            p.lineWidth = 4
+            p.stroke()
+        }
+    }
+
     static func draw(_ a: Annotation, bounds: CGRect) {
         guard let ctx = NSGraphicsContext.current else { return }
         ctx.saveGraphicsState()
@@ -397,6 +448,17 @@ final class Overlay {
         } else {
             remove { $0.id == id && $0.displayID == displayID }
         }
+    }
+
+    /// The user cleared everything (menu or ⌃⌥⌘C). Tell waiting agents:
+    /// guides report "cancelled", pending tasks report "dismissed".
+    func userClearAll() {
+        Guides.shared.cancelAll(record: true)
+        var seen = Set<String>()
+        for a in annotations where a.task && seen.insert(a.id).inserted {
+            recordEvent(id: a.id, action: "dismissed", display: a.displayName, label: a.caption ?? a.text)
+        }
+        remove { _ in true }
     }
 
     func recordEvent(id: String, action: String, display: String, label: String?) {

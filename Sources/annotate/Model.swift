@@ -33,6 +33,7 @@ struct Annotation {
     var windowApp: String?
     var windowOrigin: CGPoint = .zero  // window's last-seen top-left, CG global
     var hidden = false           // anchored window is minimized / on another Space
+    var pulseStart: Date?        // attention pulse when first shown
 
     mutating func shift(dx: CGFloat, dy: CGFloat) {
         rect = rect.offsetBy(dx: dx, dy: dy)
@@ -135,6 +136,7 @@ enum ShapeParser {
             a.task = bool(s, "task") ?? false
             if let dt = str(s, "done_text"), !dt.isEmpty { a.doneText = dt; a.task = bool(s, "task") ?? true }
             a.dismissible = bool(s, "dismissible") ?? true
+            if (bool(s, "pulse") ?? true) && kind != .spotlight { a.pulseStart = Date() }
             if kind == .highlight, s["color"] == nil, s["urgency"] == nil {
                 a.color = Palette.hex("#FFD60A")!
             }

@@ -68,6 +68,17 @@ check "guide completes"      "'$BIN' wait id=g timeout=2" '"action" : "completed
 check "✕ cancels guide"      "'$BIN' wait id=c timeout=2" '"action" : "cancelled"'
 check "bad step rejected"    "'$BIN' guide '[{\"type\":\"rect\"}]'" 'missing required number'
 
+echo "User clear-all"
+"$BIN" marker x=40 y=40 number=1 id=pending task=true >/dev/null
+"$BIN" guide '[{"type":"marker","x":5,"y":5,"number":1},{"type":"marker","x":5,"y":5,"number":2}]' id=gc >/dev/null
+"$BIN" json '{"cmd":"_simulate_clear_all"}' >/dev/null
+check "clear-all dismisses tasks" "'$BIN' wait id=pending timeout=2" '"action" : "dismissed"'
+check "clear-all cancels guides"  "'$BIN' wait id=gc timeout=2" '"action" : "cancelled"'
+check "nothing left"              "'$BIN' list | grep -c '\"id\"'" '0'
+check "pulse can be disabled"     "'$BIN' circle x=50 y=50 radius=20 pulse=false id=np" '"drawn"'
+check "login status"              "'$BIN' login status" 'Start at login'
+"$BIN" clear >/dev/null
+
 echo "Windows"
 check "list_windows"         "'$BIN' windows" '"windows"'
 check "unknown window"       "'$BIN' rect window=NoSuchAppXYZ x=1 y=1 width=5 height=5" 'No visible window matches'

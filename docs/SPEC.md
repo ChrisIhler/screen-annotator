@@ -1,6 +1,6 @@
 # Screen Annotator: technical specification
 
-Version 0.3 · macOS 13+ · Swift, AppKit, no third-party dependencies.
+Version 0.4 · macOS 13+ · Swift, AppKit, no third-party dependencies.
 
 ## 1. Goals
 
@@ -48,6 +48,7 @@ successful ping.
 | `Tutorial.swift` | Interactive first-run tutorial |
 | `Windows.swift` | App window discovery and selector resolution |
 | `Guide.swift` | Guided mode: step queue that advances on ✓ Next |
+| `System.swift` | Global ⌃⌥⌘C shortcut (Carbon hot key) and start-at-login LaunchAgent |
 
 ## 3. Windows
 
@@ -96,6 +97,8 @@ object on one line; each gets one JSON object line back. Responses always includ
 | `events` | optional `id`, `consume` (default true) | `event` (oldest unread click, or null) |
 | `list_windows` | — | `windows[]`: `window_id app title? bounds display display_bounds` |
 | `guide` | `steps[]`, `id`, shared shape options, `clear_first` | `guide`, `steps` |
+| `login_item` | optional `enabled` (bool) | `start_at_login` |
+| `_simulate_clear_all` | — | test hook; behaves like ⌃⌥⌘C |
 | `quit` | — | daemon exits after replying |
 | `_simulate_click` | `id`, `action` | test hook; behaves like a user click |
 
@@ -144,6 +147,15 @@ the step event, flashes it, and 0.5 s later shows the next step. On ✕ the guid
 `completed` / `cancelled` are recorded under `<gid>`. Starting a guide with an existing id replaces it;
 `clear` without filters cancels all guides.
 
+## 6c. Attention, shortcut, login
+
+- **Pulse:** each new non-spotlight mark gets `pulseStart`; for 1.4 s the view redraws at 30 fps and strokes two
+  expanding rings (0–36 pt beyond the mark's bounds, alpha fading 0.85→0), staggered by 0.42 s.
+- **⌃⌥⌘C:** registered with `RegisterEventHotKey` (no Accessibility permission). It and the menu's Clear all call
+  `userClearAll`: guides record `cancelled`, every pending task id records `dismissed`, then all marks go.
+- **Login:** `~/Library/LaunchAgents/io.github.chrisihler.screen-annotator.plist` runs `annotate daemon` with
+  `RunAtLoad`, limited to the Aqua session. `login_item` socket command / `annotate login` toggle it.
+
 ## 7. MCP server
 
 JSON-RPC 2.0, newline-delimited, over stdio. Implements `initialize` (echoes the client's
@@ -164,7 +176,7 @@ Tools map to socket commands (`draw_*` → `draw` with one shape; `annotate` →
 
 ## 9. Testing
 
-`tests/run.sh` is an end-to-end suite (50 checks) that drives the real binary: CLI, every shape, units,
+`tests/run.sh` is an end-to-end suite (55 checks) that drives the real binary: CLI, every shape, units,
 display selectors, validation errors, atomic batches, click events via `_simulate_click`, guided mode
 (advance, complete, cancel), window anchoring with a real moving test window (`tests/MovingWindow.swift`),
 and the MCP protocol. It needs a logged-in session with at least one display and draws briefly. CI runs it on a
@@ -182,5 +194,4 @@ GitHub-hosted macOS runner after a universal build.
 
 ## 11. Roadmap
 
-- Attention pulse on new marks, global clear shortcut, launch at login.
 - Signed and notarized builds; Homebrew tap.

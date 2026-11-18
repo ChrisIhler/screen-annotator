@@ -122,6 +122,7 @@ Coordinates start at the **top-left of the chosen display**. `units=`:
 | `task` / `done_text` | Add a clickable **✓ Done** button (custom text with `done_text`) |
 | `dismissible` | Show the clickable **✕** (default `true`) |
 | `duration_seconds` | Clear automatically |
+| `pulse` | Two attention rings when the mark appears (default `true`) |
 | `pin_to_current_space` | Show only on the current desktop (default: all desktops) |
 | `clear_first` | Wipe the target display before drawing |
 
@@ -202,9 +203,17 @@ Marks follow you to every desktop by default. With `pin_to_current_space=true` a
 that was active when it was drawn. macOS offers no public way to target a desktop by number, so switch to it
 first.
 
-## Menu bar
+## Menu bar, shortcut and login
 
-While the overlay runs, a pencil icon in the menu bar shows the mark count with **Clear all** and **Quit**.
+While the overlay runs, a pencil icon in the menu bar shows the mark count, **Clear all**, **Start at login**
+and **Quit**. Press **⌃⌥⌘C** (Control-Option-Command-C) in any app to clear every mark; no permission needed.
+Clearing this way tells a waiting AI that its steps were dismissed or cancelled.
+
+```bash
+annotate login on      # start the overlay automatically when you log in (off: annotate login off)
+```
+
+New marks pulse twice so they're easy to find. Pass `pulse=false` for a quiet mark.
 
 ## Development
 

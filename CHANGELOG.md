@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 — 2026-11-18
+- **Attention pulse:** new marks send out two fading rings so they're easy to spot on big or multiple screens
+  (`pulse=false` to turn off).
+- **⌃⌥⌘C clears everything**, from any app, without Accessibility permission. Clearing from the shortcut or the
+  menu tells waiting agents: pending tasks report `dismissed`, guides report `cancelled`.
+- **Start at login:** `annotate login on|off|status`, or the menu-bar toggle (a per-user LaunchAgent).
+- `scripts/release.sh` for future releases. Tests: 55 checks.
+
 ## 0.3.0 — 2026-11-18
 - **Window anchoring:** `window=Chrome` (app name, title, window id or `front`) makes coordinates relative to
   that window; marks follow it as it moves or changes display and hide while it's minimized or on another desktop.
