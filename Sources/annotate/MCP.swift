@@ -55,6 +55,11 @@ enum MCPServer {
 
     private static func call(_ name: String, _ args: [String: Any]) -> [String: Any] {
         if name == "wait_for_click" { return waitForClick(args) }
+        if name == "run_tutorial" {
+            var lines: [String] = []
+            let r = Tutorial.run(display: (args["display"] as? String) ?? "mouse") { lines.append($0) }
+            return toolText((r.completed ? "Tutorial completed.\n" : "Tutorial not completed.\n") + lines.joined(separator: "\n"), isError: false)
+        }
         guard let req = Tools.request(for: name, args) else {
             return toolText("Unknown tool '\(name)'.", isError: true)
         }
@@ -182,6 +187,9 @@ enum Tools {
             tool("wait_for_click", "Wait until the user clicks an annotation's ✓ Done or ✕ button, then return what they clicked (id, action \"done\" or \"dismissed\"). Each click is returned once. Use timeout_seconds=0 to just check without waiting.", [
                 "id": s("Only wait for clicks on this annotation id."),
                 "timeout_seconds": n("How long to wait. Default 120, max 600."),
+            ], required: [], withCommon: false),
+            tool("run_tutorial", "Run the interactive first-run tutorial on the user's screen (about one minute). It shows each kind of mark and waits for the user to press the on-screen buttons. Tell the user to watch the screen their mouse is on before calling.", [
+                "display": s("Display to run it on. Default: the one under the mouse pointer."),
             ], required: [], withCommon: false),
             tool("list_annotations", "List annotations currently on screen.", [:], required: [], withCommon: false),
         ]

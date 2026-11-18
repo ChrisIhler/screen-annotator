@@ -1,53 +1,40 @@
 # Screen Annotator
 
-Let an AI assistant (or you) draw on top of your Mac's screens: circle a button, point an arrow at a field,
-box a region, highlight a line, drop numbered step markers, or spotlight one area, then clear it all.
+**On-screen pointing for AI agents on macOS.** Let Claude, or any AI tool that speaks
+[MCP](https://modelcontextprotocol.io), or any script, draw on top of your screens: circle a button,
+point an arrow at a field, box a region, highlight a line, drop numbered step markers, or spotlight
+one area. Each step can carry a clickable **✓ Done** button, so the AI can walk you through a task one
+step at a time and continue when you press it.
 
-The drawings live in a transparent, **click-through**, always-on-top overlay. You can keep working underneath them;
-clicks and typing pass straight through to your apps.
+The drawings live in a transparent, **click-through**, always-on-top overlay. You keep working underneath;
+clicks and typing pass straight through to your apps. Drawing needs **no macOS permissions**.
 
-It ships as one small native binary, `annotate`, that works three ways:
+## Works with any AI (or none)
 
-| Mode | Use it for |
+Screen Annotator isn't tied to one assistant. It offers three interfaces to the same overlay:
+
+| Interface | Who uses it |
 | --- | --- |
-| `annotate mcp` | An [MCP](https://modelcontextprotocol.io) server, so Claude (or any MCP client) can draw with tools like `draw_circle`, `draw_arrow`, `clear` |
-| `annotate circle …` | A command-line tool for scripts and quick use |
-| `annotate daemon` | The overlay itself. It starts on its own the first time anything draws |
-
-Requires macOS 13 or later. No third-party dependencies.
+| **MCP server** (`annotate mcp`) | Claude Code, Claude Desktop, and any other MCP-capable app or agent framework |
+| **Command line** (`annotate circle …`) | Shell scripts, other AI tools that can run commands, you |
+| **JSON over a local socket** | Any program in any language (see [docs/SPEC.md](docs/SPEC.md)) |
 
 ## Install
 
-### As a Claude Code plugin (easiest)
+### Claude Code plugin (easiest for Claude users)
 
 ```
 /plugin install screen-annotator --marketplace ChrisIhler/screen-annotator
 ```
 
-This bundles a prebuilt universal binary, the MCP server and a skill that teaches Claude how to point at things.
+Includes a prebuilt universal binary, the MCP server, and a skill that teaches Claude how to point at things.
 
-### Claude Desktop
+### Download the binary (any MCP client)
 
-Download `screen-annotator.mcpb` from the Releases page and double-click it.
-
-### From source
-
-```bash
-git clone https://github.com/ChrisIhler/screen-annotator.git && cd screen-annotator
-./scripts/install.sh          # builds and installs ~/.local/bin/annotate
-```
-
-Building needs Apple's Command Line Tools (`xcode-select --install`); full Xcode is not required.
-
-### Connect it to Claude Code
-
-```bash
-claude mcp add --scope user screen-annotator -- ~/.local/bin/annotate mcp
-```
-
-### Connect it to Claude Desktop (or another MCP client)
-
-Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`, then restart the app:
+1. Download `annotate-<version>-macos.tar.gz` from [Releases](https://github.com/ChrisIhler/screen-annotator/releases) and unpack it.
+2. Move `annotate` somewhere permanent, for example `~/.local/bin/annotate`.
+3. If macOS blocks it the first time ("unidentified developer"), run `xattr -d com.apple.quarantine ~/.local/bin/annotate`.
+4. Point your AI app's MCP settings at it:
 
 ```json
 {
@@ -57,17 +44,37 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`, t
 }
 ```
 
+For Claude Desktop this file is `~/Library/Application Support/Claude/claude_desktop_config.json`.
+For Claude Code: `claude mcp add --scope user screen-annotator -- ~/.local/bin/annotate mcp`.
+Other MCP clients (Cursor, VS Code, agent frameworks) use the same command and argument.
+
+### Build from source
+
+```bash
+git clone https://github.com/ChrisIhler/screen-annotator.git
+cd screen-annotator
+./scripts/install.sh          # builds and installs ~/.local/bin/annotate
+```
+
+Needs Apple's Command Line Tools (`xcode-select --install`). Full Xcode isn't required. macOS 13+, Apple Silicon or Intel.
+
+## First run: the 1-minute tutorial
+
+```bash
+annotate tutorial
+```
+
+On the screen under your mouse pointer it shows each kind of mark, asks you to press **✓ Next**,
+shows that clicks pass through the marks, has you close one with **✕**, and checks whether screenshots
+can see your screen. AI apps can start the same tutorial with the `run_tutorial` tool, so you can just ask
+your assistant to "show me how screen annotations work".
+
 ## macOS permissions
 
-**Drawing needs no permissions.** The overlay is an ordinary window that ignores the mouse, so macOS does not ask
-for anything when it appears.
-
-You may see these prompts only if you combine it with other tools:
-
-- **Screen Recording.** Needed by whatever *takes screenshots* (for example Claude's computer-use tool, or
-  `screencapture`) so the assistant can see where to draw. Screen Annotator itself never reads your screen.
-- **Accessibility.** Not used. Screen Annotator does not control the mouse or keyboard and cannot switch
-  desktops for you.
+- **Drawing: none.** The overlay is an ordinary window that ignores the mouse.
+- **Screen Recording:** only for whatever *takes screenshots* so the AI can see where to draw (for example
+  Claude's computer-use tool). Screen Annotator itself never reads your screen.
+- **Accessibility:** not used. It does not control your mouse or keyboard.
 
 ## Displays and coordinates
 
@@ -75,32 +82,28 @@ You may see these prompts only if you combine it with other tools:
 annotate displays
 ```
 
-Each display gets an `index`, its `name`, a `position` worked out from your arrangement in
-System Settings › Displays (`upper-left`, `lower-right`, …), its size in points, and whether the mouse is on it.
+Each display gets an `index`, its `name`, a `position` from your arrangement in System Settings › Displays
+(`upper-left`, `lower-right`, …), its size in points, and whether the mouse is on it.
 
-Choose a display with `display=`:
-
-| Selector | Meaning |
+| `display=` | Meaning |
 | --- | --- |
 | `0`, `1`, `2` | Index from `annotate displays` |
 | `HDR`, `ultrawide`, `built-in` | Any part of the display name, or the built-in laptop screen |
 | `left`, `right`, `top`, `bottom` | Physical arrangement |
-| `main` | The display with the menu bar (the default) |
-| `mouse` | Whichever display the pointer is on |
-| `all` | Every display (same coordinates on each) |
+| `main` | The display with the menu bar (default) |
+| `mouse` | The display under the pointer |
+| `all` | Every display |
 
-Coordinates start at the **top-left of the chosen display**. Pick units with `units=`:
-
-- `points` (default): macOS points, the "looks like" resolution in System Settings.
-- `pixels`: physical pixels, handy when you measured on a full-resolution Retina screenshot (divides by the scale).
-- `fraction`: 0 to 1 across the display's width and height. Best when working from a scaled-down screenshot.
+Coordinates start at the **top-left of the chosen display**. `units=`:
+`points` (default, macOS points), `pixels` (physical pixels, e.g. from a Retina screenshot), or
+`fraction` (0–1 of width/height, best when the AI is looking at a scaled screenshot).
 
 ## Shapes
 
 | Shape | Fields | Notes |
 | --- | --- | --- |
 | `circle` | `x y radius` | x,y is the center |
-| `circle` | `x y width height` | Draws an ellipse *around* that box, with padding |
+| `circle` | `x y width height` | Ellipse *around* that box, with padding |
 | `rect` | `x y width height` | Outline; optional `corner_radius`, `fill_opacity` |
 | `highlight` | `x y width height` | Translucent highlighter, yellow by default |
 | `arrow` | `from_x from_y to_x to_y` | Head at `to`; a `label` sits at the tail |
@@ -108,50 +111,39 @@ Coordinates start at the **top-left of the chosen display**. Pick units with `un
 | `marker` | `x y number` | Numbered badge centered at x,y |
 | `spotlight` | `x y width height` | Dims the rest of the display; `dim` sets darkness |
 
-Options for every shape:
-
-| Option | Meaning |
+| Option (any shape) | Meaning |
 | --- | --- |
 | `label` | Text pill attached to the shape |
-| `urgency` | `urgent` = 🔴 red, `soon` = 🟡 yellow, `fyi` = 🔵 blue; also prefixes the label with that emoji |
-| `color` | Name (`red`, `orange`, `green`, `blue`, `purple`…) or `#RRGGBB` / `#RRGGBBAA` |
+| `urgency` | `urgent` = 🔴 red, `soon` = 🟡 yellow, `fyi` = 🔵 blue; also prefixes the label |
+| `color` | `red`, `orange`, `green`, `blue`, `purple`… or `#RRGGBB` / `#RRGGBBAA` |
 | `line_width`, `font_size`, `opacity` | Styling |
-| `id` | Name it so you can clear just this one later |
-| `duration_seconds` | Clear automatically after this long |
-| `pin_to_current_space` | Show only on the desktop (Space) that is active now. Default: visible on all desktops |
+| `id` | Name it, to clear it or wait for its click |
+| `task` / `done_text` | Add a clickable **✓ Done** button (custom text with `done_text`) |
+| `dismissible` | Show the clickable **✕** (default `true`) |
+| `duration_seconds` | Clear automatically |
+| `pin_to_current_space` | Show only on the current desktop (default: all desktops) |
 | `clear_first` | Wipe the target display before drawing |
-| `task` | Add a clickable **✓ Done** button (green) next to the mark |
-| `done_text` | Custom Done button text, e.g. `"Task complete"` (implies `task`) |
-| `dismissible` | Show the small clickable **✕** (default `true`) |
 
 ## Clickable buttons
 
-The overlay is click-through, with one exception: each mark gets a small button strip next to its label.
+The overlay is click-through except for a small button strip beside each mark's label:
+**✕** removes the mark; **✓ Done** flashes it green, then removes it. The buttons never take focus from the
+app you're in. Every click is recorded once and can be read with `wait_for_click` (MCP) or `annotate wait` (CLI).
 
-- **✕** removes the mark.
-- **✓ Done** (only when `task` or `done_text` is set) flashes the mark green, then removes it.
-
-Both buttons are non-activating panels, so clicking them never pulls focus away from the app you're in.
-Every click is recorded, and an assistant can pick it up with the `wait_for_click` MCP tool
-(or `annotate wait` on the command line), so it can show step 1, wait for you to press Done, then move on to step 2.
-Shapes that share an `id` on the same display get a single button strip.
-
-## CLI examples
+## Command line
 
 ```bash
 annotate circle display=HDR x=600 y=400 radius=80 urgency=urgent label="Action 1"
-annotate arrow  display=left units=fraction from_x=0.2 from_y=0.2 to_x=0.5 to_y=0.5 urgency=soon label="Action 2"
-annotate highlight display=built-in x=100 y=200 width=500 height=40
-annotate marker display=right x=900 y=300 number=3
-annotate marker display=HDR x=500 y=300 number=1 urgency=urgent label="Click Save" done_text="Task complete" id=step1
-annotate wait id=step1 timeout=300   # prints {"action":"done",...} when you press it
+annotate arrow display=left units=fraction from_x=0.2 from_y=0.2 to_x=0.5 to_y=0.5 urgency=soon label="Action 2"
+annotate marker display=right x=900 y=300 number=1 label="Click Save" done_text="Task complete" id=step1
+annotate wait id=step1 timeout=300     # prints {"action":"done",...} when pressed
 annotate list
-annotate clear                     # everything
-annotate clear display=HDR         # one display
-annotate clear id=step1            # one annotation
-annotate demo display=mouse        # sample drawing that clears itself after 10 s
-annotate quit                      # stop the overlay
+annotate clear                         # or: clear display=HDR / clear id=step1
+annotate tutorial
+annotate quit                          # stop the overlay
 ```
+
+Run `annotate help` for everything.
 
 ## MCP tools
 
@@ -159,54 +151,36 @@ annotate quit                      # stop the overlay
 | --- | --- |
 | `list_displays` | Display names, arrangement, sizes, scale, mouse location |
 | `draw_circle`, `draw_rect`, `highlight`, `draw_arrow`, `label`, `marker`, `spotlight` | Draw one shape |
-| `annotate` | Draw several shapes in one call (shared options at the top level) |
+| `annotate` | Draw several shapes in one call |
+| `wait_for_click` | Wait for (or, with `timeout_seconds: 0`, check) a ✓ Done or ✕ click |
 | `clear` | Clear all, or by `id` / `display` |
 | `list_annotations` | What is on screen now |
-| `wait_for_click` | Wait for (or, with `timeout_seconds: 0`, just check) a click on ✓ Done or ✕ |
+| `run_tutorial` | Interactive first-run walkthrough |
 
-A typical flow for an assistant: take a screenshot, call `list_displays`, draw with `units: "fraction"`
-(so screenshot scaling doesn't matter) with `task: true`, call `wait_for_click`, and continue once the user presses Done.
+Typical agent flow: screenshot → `list_displays` → draw step 1 with `units: "fraction"` and `task: true` →
+`wait_for_click` → draw step 2 → … → `clear`.
 
 ## Desktops (Spaces)
 
-By default annotations follow you to every desktop, so they stay put when you switch.
-With `pin_to_current_space=true` an annotation stays on the desktop that was active when it was drawn.
-macOS gives apps no public way to target a desktop by number, so to annotate Desktop 3 specifically,
-switch to it first and then draw with `pin_to_current_space`.
+Marks follow you to every desktop by default. With `pin_to_current_space=true` a mark stays on the desktop
+that was active when it was drawn. macOS offers no public way to target a desktop by number, so switch to it
+first.
 
 ## Menu bar
 
-While anything is running, a small pencil icon sits in the menu bar showing the annotation count,
-with **Clear all annotations** and **Quit Screen Annotator**.
+While the overlay runs, a pencil icon in the menu bar shows the mark count with **Clear all** and **Quit**.
 
-## How it works
+## Development
 
-- `annotate daemon` is a background AppKit app (no Dock icon, never takes focus). It keeps one borderless,
-  transparent window per display at screen-saver level, with `ignoresMouseEvents` so input passes through,
-  and joins all Spaces and full-screen apps.
-- It listens on a Unix socket at `/tmp/screen-annotator-<uid>.sock` (mode 0600, only your user can connect)
-  and speaks newline-delimited JSON: `{"cmd":"draw","shapes":[…]}`, `clear`, `list`, `list_displays`, `ping`, `quit`.
-- `annotate mcp` and the CLI are thin clients. They start the daemon if it isn't running.
-- Display changes (plugging in a monitor, rearranging) are picked up automatically.
-
-```
-Sources/annotate/
-  main.swift      CLI entry point
-  MCP.swift       MCP server and tool catalogue
-  Client.swift    socket client, daemon auto-start
-  Daemon.swift    socket server, command handling, menu bar item
-  Overlay.swift   overlay windows and drawing
-  Controls.swift  clickable ✓ Done / ✕ buttons and click events
-  Model.swift     shape parsing, units, colors
-  Displays.swift  display discovery and selectors
+```bash
+swift build                 # debug build
+tests/run.sh                # end-to-end tests (draws briefly on your screen)
+./scripts/build-release.sh  # universal binary, plugin binary, release tarball
 ```
 
-## Ideas for later
-
-- Pulse or fade-in animation to draw the eye
-- Freehand paths and curved arrows
-- A signed `.app` bundle with login-item support, and a Claude plugin/connector package
+See [docs/SPEC.md](docs/SPEC.md) for the architecture and protocol, [CONTRIBUTING.md](CONTRIBUTING.md),
+and [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-Not chosen yet. Until a license file is added, all rights are reserved by the author.
+[MIT](LICENSE) © 2026 Chris Ihler. Not affiliated with Anthropic.

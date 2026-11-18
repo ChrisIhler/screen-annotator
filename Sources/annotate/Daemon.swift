@@ -30,6 +30,13 @@ enum Commands {
                     return ["ok": true, "event": e.json]
                 }
                 return ["ok": true, "event": NSNull()]
+            case "_simulate_click":   // used by the test suite
+                guard let id = req["id"] as? String,
+                      let a = Overlay.shared.annotations.first(where: { $0.id == id }) else {
+                    throw AnnotatorError("No annotation with that id.")
+                }
+                Overlay.shared.clicked(id: id, displayID: a.displayID, action: (req["action"] as? String) ?? "done")
+                return ["ok": true]
             case "quit":
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { NSApp.terminate(nil) }
                 return ["ok": true, "message": "Overlay daemon is quitting."]

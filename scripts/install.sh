@@ -10,5 +10,8 @@ mkdir -p "$PREFIX/bin"
 install -m 0755 .build/release/annotate "$PREFIX/bin/annotate"
 echo "Installed $PREFIX/bin/annotate"
 echo
+echo "Try it now (1-minute interactive walkthrough):"
+echo "  $PREFIX/bin/annotate tutorial"
+echo
 echo "Register with Claude Code:"
 echo "  claude mcp add --scope user screen-annotator -- $PREFIX/bin/annotate mcp"

@@ -313,7 +313,7 @@ final class Overlay {
         }
     }
 
-    private func clicked(id: String, displayID: CGDirectDisplayID, action: String) {
+    func clicked(id: String, displayID: CGDirectDisplayID, action: String) {
         let group = annotations.filter { $0.id == id && $0.displayID == displayID }
         guard let first = group.first else { return }
         nextSeq += 1

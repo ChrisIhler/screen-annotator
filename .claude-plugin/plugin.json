@@ -1,7 +1,7 @@
 {
   "name": "screen-annotator",
   "version": "0.2.0",
-  "description": "Let Claude draw on your Mac's screens: circles, arrows, boxes, highlights, numbered steps and spotlights in a click-through overlay, with clickable Done buttons so Claude can walk you through tasks step by step.",
+  "description": "On-screen pointing for AI agents on macOS: circles, arrows, highlights and numbered steps in a click-through overlay, with clickable Done buttons so the AI can walk you through tasks step by step.",
   "author": {
     "name": "Chris Ihler"
   },
@@ -13,5 +13,8 @@
     "mcp",
     "guide"
   ],
-  "icon": "assets/icon.svg"
+  "icon": "assets/icon.svg",
+  "license": "MIT",
+  "homepage": "https://github.com/ChrisIhler/screen-annotator",
+  "repository": "https://github.com/ChrisIhler/screen-annotator"
 }

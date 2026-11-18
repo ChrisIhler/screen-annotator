@@ -5,29 +5,84 @@
   "version": "__VERSION__",
   "description": "Let Claude draw circles, arrows, highlights and numbered steps over your Mac's screens, with clickable Done buttons.",
   "long_description": "A transparent, click-through overlay for macOS. Claude can point at buttons and regions on any connected display, label numbered actions, spotlight an area, and wait for you to press Done before showing the next step. Drawing needs no macOS permissions.",
-  "author": { "name": "Chris Ihler" },
+  "author": {
+    "name": "Chris Ihler"
+  },
   "server": {
     "type": "binary",
     "entry_point": "server/annotate",
     "mcp_config": {
       "command": "${__dirname}/server/annotate",
-      "args": ["mcp"]
+      "args": [
+        "mcp"
+      ]
     }
   },
   "tools": [
-    { "name": "list_displays", "description": "List displays and their arrangement" },
-    { "name": "draw_circle", "description": "Circle a spot or region" },
-    { "name": "draw_rect", "description": "Box a region" },
-    { "name": "highlight", "description": "Highlighter over a region" },
-    { "name": "draw_arrow", "description": "Arrow pointing at something" },
-    { "name": "label", "description": "Text label" },
-    { "name": "marker", "description": "Numbered step badge" },
-    { "name": "spotlight", "description": "Dim everything except one region" },
-    { "name": "annotate", "description": "Draw several shapes at once" },
-    { "name": "wait_for_click", "description": "Wait for the user to press Done or dismiss" },
-    { "name": "clear", "description": "Remove annotations" },
-    { "name": "list_annotations", "description": "List annotations on screen" }
+    {
+      "name": "list_displays",
+      "description": "List displays and their arrangement"
+    },
+    {
+      "name": "draw_circle",
+      "description": "Circle a spot or region"
+    },
+    {
+      "name": "draw_rect",
+      "description": "Box a region"
+    },
+    {
+      "name": "highlight",
+      "description": "Highlighter over a region"
+    },
+    {
+      "name": "draw_arrow",
+      "description": "Arrow pointing at something"
+    },
+    {
+      "name": "label",
+      "description": "Text label"
+    },
+    {
+      "name": "marker",
+      "description": "Numbered step badge"
+    },
+    {
+      "name": "spotlight",
+      "description": "Dim everything except one region"
+    },
+    {
+      "name": "annotate",
+      "description": "Draw several shapes at once"
+    },
+    {
+      "name": "wait_for_click",
+      "description": "Wait for the user to press Done or dismiss"
+    },
+    {
+      "name": "run_tutorial",
+      "description": "Interactive first-run walkthrough"
+    },
+    {
+      "name": "clear",
+      "description": "Remove annotations"
+    },
+    {
+      "name": "list_annotations",
+      "description": "List annotations on screen"
+    }
   ],
-  "keywords": ["macos", "overlay", "annotation", "screen"],
-  "compatibility": { "platforms": ["darwin"] }
+  "keywords": [
+    "macos",
+    "overlay",
+    "annotation",
+    "screen"
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ]
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ChrisIhler/screen-annotator"
 }

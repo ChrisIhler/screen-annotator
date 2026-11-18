@@ -11,6 +11,7 @@ USAGE
   annotate clear [display=..] [id=..]  Clear annotations (all by default)
   annotate list                      List annotations on screen
   annotate wait [id=..] [timeout=120]  Wait for a click on a ✓ Done / ✕ button
+  annotate tutorial                  Interactive 1-minute walkthrough (start here)
   annotate demo [display=right]      Draw a sample set for 10 seconds
   annotate json '<request>'          Send a raw JSON request to the daemon
   annotate quit                      Stop the overlay daemon
@@ -84,7 +85,9 @@ case "clear":
     var r = parseKV(rest); r["cmd"] = "clear"; send(r)
 case "quit", "stop":
     do { printJSON(try Client.request(["cmd": "quit"], autostart: false)) }
-    catch { print("annotate: daemon is not running.") }
+    catch { print("annotate: daemon is not running."); exit(0) }
+    // Wait until it has really gone, so a following command starts a fresh one.
+    for _ in 0..<40 where (try? Client.request(["cmd": "ping"], autostart: false)) != nil { usleep(50_000) }
     exit(0)
 case "ping", "status":
     do { printJSON(try Client.request(["cmd": "ping"], autostart: false)) }
@@ -102,6 +105,10 @@ case "wait":
         if Date() >= deadline { print("{\"clicked\": null}"); exit(1) }
         usleep(300_000)
     }
+case "tutorial", "welcome", "setup":
+    let o = parseKV(rest)
+    let r = Tutorial.run(display: ShapeParser.str(o, "display") ?? "mouse") { print($0) }
+    exit(r.completed ? 0 : 1)
 case "json":
     guard let raw = rest.first, let d = raw.data(using: .utf8),
           let obj = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else {
