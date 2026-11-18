@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-11-18
+- **Window anchoring:** `window=Chrome` (app name, title, window id or `front`) makes coordinates relative to
+  that window; marks follow it as it moves or changes display and hide while it's minimized or on another desktop.
+- **Guided mode:** `guide` tool / `annotate guide` shows steps one at a time with a "✓ Next (n/N)" button and
+  advances on its own; ✕ cancels. `wait_for_click` on the guide id returns `completed` or `cancelled`.
+- `list_windows` tool / `annotate windows`.
+- `annotate quit` now waits for the daemon to exit.
+- Tests: 50 end-to-end checks, including a real moving window.
+
 ## 0.2.0 — 2026-11-18
 - Clickable **✓ Done** and **✕** buttons on marks (the rest of the overlay stays click-through).
 - `wait_for_click` MCP tool and `annotate wait` CLI, so an assistant can walk through steps one at a time.

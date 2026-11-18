@@ -11,7 +11,8 @@ enum MCPServer {
     takes 0-1 values (best when working from a scaled screenshot), units="pixels" takes physical \
     pixels (Retina screenshots). Every mark gets a small clickable ✕ so the user can dismiss it; \
     add task=true (or done_text) to also show a "✓ Done" button, then call wait_for_click to learn when \
-    the user finished that step and continue. Use urgency (urgent=🔴 red, soon=🟡 yellow, fyi=🔵 blue) to color-code \
+    the user finished that step and continue. For multi-step help, prefer the guide tool: it shows each step with a Next button and advances by itself. \
+    Use the window option (see list_windows) to anchor marks to an app window so they follow it. Use urgency (urgent=🔴 red, soon=🟡 yellow, fyi=🔵 blue) to color-code \
     numbered actions. Annotations stay until cleared unless duration_seconds is set. Always clear \
     annotations when you are done pointing at things.
     """
@@ -120,6 +121,7 @@ enum Tools {
 
     static let common: [String: Any] = [
         "display": s("Which display: index from list_displays (\"0\"), a name fragment (\"HDR\", \"ultrawide\", \"built-in\"), \"left\", \"right\", \"top\", \"bottom\", \"main\", \"mouse\" (display under the pointer) or \"all\". Default: main display."),
+        "window": s("Anchor to an app window instead of a display: app name (\"Chrome\", \"Outlook\"), part of a window title, a window_id from list_windows, or \"front\" for the active app's front window. Coordinates are then relative to the window's top-left (units=fraction = fraction of the window), and the mark follows the window when it moves, hiding while it's minimized or on another desktop."),
         "units": ["type": "string", "enum": ["points", "pixels", "fraction"], "description": "Coordinate units. points (default) = display points from its top-left; pixels = physical pixels (Retina screenshots); fraction = 0-1 of the display's width/height."],
         "color": s("Color name (red, orange, yellow, green, blue, purple, pink, white, black, gray...) or hex #RRGGBB / #RRGGBBAA. Default red."),
         "urgency": ["type": "string", "enum": ["urgent", "soon", "fyi"], "description": "Color-code: urgent=🔴 red, soon=🟡 yellow, fyi=🔵 blue. Also prefixes the label with that emoji."],
@@ -184,6 +186,15 @@ enum Tools {
                 "id": s("Only clear annotations with this id."),
                 "display": s("Only clear this display (same selectors as drawing)."),
             ], required: [], withCommon: false),
+            tool("list_windows", "List visible app windows front to back: app name, window_id, bounds, display, and title (titles need Screen Recording permission). Use with the window option to anchor marks to a window.", [:], required: [], withCommon: false),
+            tool("guide", "Walk the user through a task: show steps one at a time. Each step appears with a \"✓ Next\" button (\"✓ Done\" on the last) and the next step appears automatically when pressed, no extra calls needed. ✕ cancels. Afterwards call wait_for_click with id = the guide id; it returns action \"completed\" or \"cancelled\". Top-level options (display, window, units, urgency...) apply to every step.", [
+                "id": s("Guide id (default \"guide\"). Step marks get ids <id>.1, <id>.2, …"),
+                "steps": ["type": "array", "description": "Ordered steps. Each is {\"title\": \"Click Save\", \"shapes\": [shape, …]} or a single shape object with \"type\". The title becomes the label \"Step n/N: title\".",
+                          "items": ["type": "object", "properties": [
+                              "title": s("What to do in this step."),
+                              "shapes": ["type": "array", "items": ["type": "object", "properties": shapeItem, "required": ["type"], "additionalProperties": true]],
+                          ], "additionalProperties": true]],
+            ], required: ["steps"]),
             tool("wait_for_click", "Wait until the user clicks an annotation's ✓ Done or ✕ button, then return what they clicked (id, action \"done\" or \"dismissed\"). Each click is returned once. Use timeout_seconds=0 to just check without waiting.", [
                 "id": s("Only wait for clicks on this annotation id."),
                 "timeout_seconds": n("How long to wait. Default 120, max 600."),
@@ -204,6 +215,9 @@ enum Tools {
             var r = args; r["cmd"] = "clear"; return r
         case "annotate":
             var r = args; r["cmd"] = "draw"; return r
+        case "guide":
+            var r = args; r["cmd"] = "guide"; return r
+        case "list_windows": return ["cmd": "list_windows"]
         default:
             guard let type = shapeTools[name] else { return nil }
             var shape = args

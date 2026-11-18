@@ -224,6 +224,7 @@ final class Overlay {
         }
         refresh()
         rebuildControls()
+        startFollowingIfNeeded()
     }
 
     /// Remove matching annotations; returns how many were removed.
@@ -237,6 +238,7 @@ final class Overlay {
         }
         refresh()
         rebuildControls()
+        startFollowingIfNeeded()
         return gone.count
     }
 
@@ -248,7 +250,7 @@ final class Overlay {
         }
         for screen in screens {
             let id = Displays.id(of: screen)
-            let items = annotations.filter { !$0.pinned && $0.displayID == id }
+            let items = annotations.filter { !$0.pinned && !$0.hidden && $0.displayID == id }
             if items.isEmpty {
                 displayWindows[id]?.orderOut(nil)
                 displayWindows[id]?.view.items = []
@@ -261,6 +263,58 @@ final class Overlay {
             w.orderFrontRegardless()
         }
         onChange?()
+    }
+
+    // MARK: Window following
+
+    private var followTimer: Timer?
+
+    /// Poll anchored windows (5x a second) and move their marks with them.
+    func startFollowingIfNeeded() {
+        let any = annotations.contains { $0.windowID != nil }
+        if any && followTimer == nil {
+            followTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in self?.followWindows() }
+        } else if !any {
+            followTimer?.invalidate(); followTimer = nil
+        }
+    }
+
+    private func followWindows() {
+        var changed = Set<Int>()
+        for i in annotations.indices {
+            guard let wid = annotations[i].windowID else { continue }
+            guard let b = Windows.bounds(of: wid) else {
+                if !annotations[i].hidden { annotations[i].hidden = true; changed.insert(annotations[i].uid) }
+                continue
+            }
+            var a = annotations[i]
+            let wasHidden = a.hidden
+            a.hidden = false
+            if b.origin != a.windowOrigin || wasHidden {
+                let oldScreen = Displays.screen(for: a.displayID)
+                a.shift(dx: b.minX - a.windowOrigin.x, dy: b.minY - a.windowOrigin.y)
+                a.windowOrigin = b.origin
+                if let newScreen = Windows.screen(containing: b), let old = oldScreen,
+                   Displays.id(of: newScreen) != a.displayID {
+                    let o = Windows.topLeft(of: old), n = Windows.topLeft(of: newScreen)
+                    a.shift(dx: o.x - n.x, dy: o.y - n.y)
+                    a.displayID = Displays.id(of: newScreen)
+                    a.displayName = newScreen.localizedName
+                }
+                changed.insert(a.uid)
+            }
+            annotations[i] = a
+        }
+        guard !changed.isEmpty else { return }
+        for uid in changed {
+            if let p = controlPanels.removeValue(forKey: uid) { p.orderOut(nil); p.close() }
+            if let w = pinnedWindows[uid], let a = annotations.first(where: { $0.uid == uid }) {
+                w.view.items = a.hidden ? [] : [a]
+                if let s = Displays.screen(for: a.displayID) { w.setFrame(s.frame, display: true) }
+            }
+        }
+        refresh()
+        rebuildControls()
     }
 
     func screensChanged() {
@@ -280,7 +334,7 @@ final class Overlay {
     private func rebuildControls() {
         var wanted: [Int: Annotation] = [:]
         var seen = Set<String>()
-        for a in annotations where a.task || a.dismissible {
+        for a in annotations where (a.task || a.dismissible) && !a.hidden {
             let key = "\(a.id)|\(a.displayID)"
             if seen.insert(key).inserted { wanted[a.uid] = a }
         }
@@ -320,6 +374,7 @@ final class Overlay {
         events.append(ClickEvent(seq: nextSeq, id: id, action: action, display: first.displayName,
                                  label: first.caption ?? first.text, at: Date()))
         if events.count > 500 { events.removeFirst(events.count - 500) }
+        defer { Guides.shared.stepClicked(id: id, action: action) }
 
         if action == "done" {
             // Brief green "✓ Done" confirmation, then remove.
@@ -342,6 +397,11 @@ final class Overlay {
         } else {
             remove { $0.id == id && $0.displayID == displayID }
         }
+    }
+
+    func recordEvent(id: String, action: String, display: String, label: String?) {
+        nextSeq += 1
+        events.append(ClickEvent(seq: nextSeq, id: id, action: action, display: display, label: label, at: Date()))
     }
 
     /// Return (and by default consume) the oldest unread click, optionally for one id.

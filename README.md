@@ -117,12 +117,44 @@ Coordinates start at the **top-left of the chosen display**. `units=`:
 | `urgency` | `urgent` = 🔴 red, `soon` = 🟡 yellow, `fyi` = 🔵 blue; also prefixes the label |
 | `color` | `red`, `orange`, `green`, `blue`, `purple`… or `#RRGGBB` / `#RRGGBBAA` |
 | `line_width`, `font_size`, `opacity` | Styling |
+| `window` | Anchor to an app window (see above); the mark follows it |
 | `id` | Name it, to clear it or wait for its click |
 | `task` / `done_text` | Add a clickable **✓ Done** button (custom text with `done_text`) |
 | `dismissible` | Show the clickable **✕** (default `true`) |
 | `duration_seconds` | Clear automatically |
 | `pin_to_current_space` | Show only on the current desktop (default: all desktops) |
 | `clear_first` | Wipe the target display before drawing |
+
+## Point at a window, not just a screen
+
+Add `window=` to any shape to anchor it to an app window: an app name (`Chrome`, `Outlook`), part of a window
+title, a `window_id` from `annotate windows`, or `front` for the active app. Coordinates become relative to the
+window's top-left (`units=fraction` means a fraction of the window), and the mark **follows the window** when you
+move it, even to another monitor. It hides while the window is minimized or on another desktop and comes back with it.
+
+```bash
+annotate windows
+annotate circle window=Chrome units=fraction x=0.9 y=0.05 radius=20 urgency=urgent label="Extensions"
+```
+
+App names and positions need no permission; window titles are only visible with Screen Recording permission.
+
+## Guided mode
+
+Give a list of steps and Screen Annotator runs the walkthrough by itself: step 1 appears with
+**✓ Next (2/3)**, pressing it shows step 2, and the last step says **✓ Done**. **✕** cancels.
+
+```bash
+annotate guide '{"id":"save","window":"Pages","units":"fraction","steps":[
+  {"title":"Open the File menu","shapes":[{"type":"circle","x":0.05,"y":0.02,"radius":0.02}]},
+  {"title":"Choose Export To › PDF","shapes":[{"type":"arrow","from_x":0.3,"from_y":0.3,"to_x":0.12,"to_y":0.2}]},
+  {"title":"Click Next, then Save","shapes":[{"type":"highlight","x":0.6,"y":0.8,"width":0.3,"height":0.06}]}
+]}'
+annotate wait id=save        # → "completed" or "cancelled"
+```
+
+An agent calls the `guide` tool once and `wait_for_click` with the guide id, instead of drawing and waiting
+step by step.
 
 ## Clickable buttons
 
@@ -137,6 +169,8 @@ annotate circle display=HDR x=600 y=400 radius=80 urgency=urgent label="Action 1
 annotate arrow display=left units=fraction from_x=0.2 from_y=0.2 to_x=0.5 to_y=0.5 urgency=soon label="Action 2"
 annotate marker display=right x=900 y=300 number=1 label="Click Save" done_text="Task complete" id=step1
 annotate wait id=step1 timeout=300     # prints {"action":"done",...} when pressed
+annotate windows
+annotate guide '[{"type":"marker","x":100,"y":100,"number":1,"label":"First"},{"type":"marker","x":300,"y":100,"number":2,"label":"Then"}]'
 annotate list
 annotate clear                         # or: clear display=HDR / clear id=step1
 annotate tutorial
@@ -152,13 +186,15 @@ Run `annotate help` for everything.
 | `list_displays` | Display names, arrangement, sizes, scale, mouse location |
 | `draw_circle`, `draw_rect`, `highlight`, `draw_arrow`, `label`, `marker`, `spotlight` | Draw one shape |
 | `annotate` | Draw several shapes in one call |
+| `guide` | Step-by-step walkthrough that advances on ✓ Next |
+| `list_windows` | Visible app windows (app, id, bounds, display, title) |
 | `wait_for_click` | Wait for (or, with `timeout_seconds: 0`, check) a ✓ Done or ✕ click |
 | `clear` | Clear all, or by `id` / `display` |
 | `list_annotations` | What is on screen now |
 | `run_tutorial` | Interactive first-run walkthrough |
 
-Typical agent flow: screenshot → `list_displays` → draw step 1 with `units: "fraction"` and `task: true` →
-`wait_for_click` → draw step 2 → … → `clear`.
+Typical agent flow: screenshot → `list_displays` / `list_windows` → `guide` with all steps (anchored with
+`window` and `units: "fraction"`) → `wait_for_click` on the guide id → `clear`.
 
 ## Desktops (Spaces)
 

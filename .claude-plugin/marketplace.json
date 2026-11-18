@@ -9,7 +9,7 @@
       "name": "screen-annotator",
       "source": "./",
       "description": "Draw annotations over your Mac's screens from Claude, with clickable Done buttons.",
-      "version": "0.2.0"
+      "version": "0.3.0"
     }
   ]
 }

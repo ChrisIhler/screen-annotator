@@ -1,7 +1,7 @@
 import AppKit
 import Darwin
 
-let annotatorVersion = "0.2.0"
+let annotatorVersion = "0.3.0"
 
 /// Path of the local control socket. Only the current user can connect (0600).
 let socketPath = "/tmp/screen-annotator-\(getuid()).sock"
@@ -22,7 +22,7 @@ enum Commands {
             case "clear":
                 return try clear(req)
             case "list", "list_annotations":
-                return ["ok": true, "annotations": Overlay.shared.annotations.map(\.summary)]
+                return ["ok": true, "annotations": Overlay.shared.annotations.map(\.summary), "guides": Guides.shared.status]
             case "events", "take_event":
                 let id = (req["id"] as? String).flatMap { $0.isEmpty ? nil : $0 }
                 let consume = ShapeParser.bool(req, "consume") ?? true
@@ -30,6 +30,11 @@ enum Commands {
                     return ["ok": true, "event": e.json]
                 }
                 return ["ok": true, "event": NSNull()]
+            case "list_windows", "windows":
+                return ["ok": true, "windows": Windows.list().map(\.json),
+                        "note": "Window titles appear only if this app has Screen Recording permission; app names always do."]
+            case "guide":
+                return try Guides.shared.start(req)
             case "_simulate_click":   // used by the test suite
                 guard let id = req["id"] as? String,
                       let a = Overlay.shared.annotations.first(where: { $0.id == id }) else {
@@ -75,6 +80,8 @@ enum Commands {
         if let sel = req["display"], !((sel as? String)?.isEmpty ?? false) {
             displays = Set(try Displays.resolve(sel).map(Displays.id(of:)))
         }
+        if id == nil && displays == nil { Guides.shared.cancelAll() }
+        if let id { Guides.shared.cancel(id, record: false) }
         let n = Overlay.shared.remove { a in
             (id == nil || a.id == id) && (displays == nil || displays!.contains(a.displayID))
         }
@@ -197,7 +204,7 @@ final class DaemonDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) { unlink(socketPath) }
 
-    @objc private func clearAll() { Overlay.shared.remove { _ in true } }
+    @objc private func clearAll() { Guides.shared.cancelAll(); Overlay.shared.remove { _ in true } }
     @objc private func quit() { NSApp.terminate(nil) }
 }
 

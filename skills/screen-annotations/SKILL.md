@@ -12,9 +12,12 @@ description: Point at things on the user's Mac screens with the screen-annotator
 3. Color-code with `urgency`: `urgent` 🔴 for the action to take now, `soon` 🟡 for next, `fyi` 🔵 for context.
    Give each action a short `label` such as "Action 1: click Save".
 4. In chat, name the monitor, the desktop and the window, and number the actions to match the marks.
-5. For step-by-step help, draw one step with `task: true` (or `done_text: "Task complete"`) and a stable `id`,
-   call `wait_for_click` with that id, and draw the next step when it returns `"action": "done"`.
-   `"dismissed"` means the user closed it with ✕; ask before continuing.
-6. Clean up: `clear` when you're finished pointing, or set `duration_seconds` for passing hints.
+5. For step-by-step help, use the `guide` tool with all the steps at once; it shows "✓ Next" on each step and
+   advances by itself. Then call `wait_for_click` with the guide id: `"completed"` means every step is done,
+   `"cancelled"` means the user closed it with ✕, so ask before continuing.
+   For a single action, draw it with `task: true` and wait on its id instead.
+6. When pointing inside one app, pass `window` (app name, from `list_windows`) with `units: "fraction"` of the
+   window, so marks stay on target if the user moves the window.
+7. Clean up: `clear` when you're finished pointing, or set `duration_seconds` for passing hints.
 
 Drawing needs no macOS permissions. Screenshots need Screen Recording permission for the app taking them.

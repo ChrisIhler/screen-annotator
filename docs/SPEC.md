@@ -1,6 +1,6 @@
 # Screen Annotator: technical specification
 
-Version 0.2 · macOS 13+ · Swift, AppKit, no third-party dependencies.
+Version 0.3 · macOS 13+ · Swift, AppKit, no third-party dependencies.
 
 ## 1. Goals
 
@@ -46,6 +46,8 @@ successful ping.
 | `Model.swift` | Shape parsing and validation, units, colors |
 | `Displays.swift` | Display discovery, arrangement labels, selector resolution |
 | `Tutorial.swift` | Interactive first-run tutorial |
+| `Windows.swift` | App window discovery and selector resolution |
+| `Guide.swift` | Guided mode: step queue that advances on ✓ Next |
 
 ## 3. Windows
 
@@ -92,6 +94,8 @@ object on one line; each gets one JSON object line back. Responses always includ
 | `clear` | optional `id`, `display` | `cleared`, `remaining` |
 | `list` | — | `annotations[]` |
 | `events` | optional `id`, `consume` (default true) | `event` (oldest unread click, or null) |
+| `list_windows` | — | `windows[]`: `window_id app title? bounds display display_bounds` |
+| `guide` | `steps[]`, `id`, shared shape options, `clear_first` | `guide`, `steps` |
 | `quit` | — | daemon exits after replying |
 | `_simulate_click` | `id`, `action` | test hook; behaves like a user click |
 
@@ -118,6 +122,28 @@ display. Arrow captions sit beyond the tail.
 On **✓ Done**: record event, recolor the group green with caption "✓ <done_text>", remove after 0.9 s.
 On **✕**: record event, remove immediately.
 
+## 6a. Window anchoring
+
+`window` is resolved against `CGWindowListCopyWindowInfo(onScreenOnly | excludeDesktopElements)`, layer 0,
+excluding the daemon's own windows, front to back: numeric window id → `front` (first window of the frontmost
+app) → exact app name → app-name substring → title substring. Titles require Screen Recording permission;
+app names and bounds don't.
+
+The shape is parsed with the window's size as the unit base, then shifted by the window's offset on the display
+that contains its center. The annotation stores the window id and last-seen origin. While any anchored mark
+exists, a 200 ms timer reads each window's bounds (`optionIncludingWindow`): a moved window shifts its marks by
+the delta; a change of display re-bases them; a window that is closed, minimized or on another Space marks them
+`hidden` (not drawn, no buttons) until it returns. Button panels for moved marks are rebuilt.
+
+## 6b. Guided mode
+
+`guide` validates every step (dry-run parse) before showing anything. Step *n* (1-based) gets id `<gid>.<n>` on
+all its shapes; the first shape gets `done_text` "Next (n+1/N)" or "Done", the ✕ button, and the caption
+"Step n/N: <title>". Shared options (default `urgency: urgent`) apply to every step. On ✓ the overlay records
+the step event, flashes it, and 0.5 s later shows the next step. On ✕ the guide is cancelled. Guide-level events
+`completed` / `cancelled` are recorded under `<gid>`. Starting a guide with an existing id replaces it;
+`clear` without filters cancels all guides.
+
 ## 7. MCP server
 
 JSON-RPC 2.0, newline-delimited, over stdio. Implements `initialize` (echoes the client's
@@ -126,7 +152,7 @@ Notifications are ignored. Unknown methods return `-32601`. Tool failures return
 readable message rather than a protocol error.
 
 Tools map to socket commands (`draw_*` → `draw` with one shape; `annotate` → `draw`; `clear`;
-`list_annotations` → `list`; `list_displays`). `wait_for_click` polls `events` every 300 ms up to
+`list_annotations` → `list`; `list_displays`; `list_windows`; `guide`). `wait_for_click` polls `events` every 300 ms up to
 `timeout_seconds` (default 120, max 600). `run_tutorial` runs the tutorial and returns its transcript.
 
 ## 8. Security and privacy
@@ -138,9 +164,10 @@ Tools map to socket commands (`draw_*` → `draw` with one shape; `annotate` →
 
 ## 9. Testing
 
-`tests/run.sh` is an end-to-end suite (37 checks) that drives the real binary: CLI, every shape, units,
-display selectors, validation errors, atomic batches, click events via `_simulate_click`, and the MCP
-protocol. It needs a logged-in session with at least one display and draws briefly. CI runs it on a
+`tests/run.sh` is an end-to-end suite (50 checks) that drives the real binary: CLI, every shape, units,
+display selectors, validation errors, atomic batches, click events via `_simulate_click`, guided mode
+(advance, complete, cancel), window anchoring with a real moving test window (`tests/MovingWindow.swift`),
+and the MCP protocol. It needs a logged-in session with at least one display and draws briefly. CI runs it on a
 GitHub-hosted macOS runner after a universal build.
 
 ## 10. Packaging
@@ -155,7 +182,5 @@ GitHub-hosted macOS runner after a universal build.
 
 ## 11. Roadmap
 
-- Window targeting: anchor marks to an app window by name and follow it as it moves.
-- Guided mode: queue steps that appear one by one as the user presses Done.
 - Attention pulse on new marks, global clear shortcut, launch at login.
 - Signed and notarized builds; Homebrew tap.

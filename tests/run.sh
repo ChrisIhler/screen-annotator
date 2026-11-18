@@ -54,9 +54,43 @@ check "click consumed once"  "'$BIN' wait id=step timeout=0; echo rc=\$?" 'rc=1'
 "$BIN" json '{"cmd":"_simulate_click","id":"gone","action":"dismissed"}' >/dev/null
 check "dismiss removes mark" "'$BIN' wait id=gone timeout=2 && '$BIN' list" '"annotations" : ['
 
+echo "Guided mode"
+"$BIN" json '{"cmd":"events"}' >/dev/null
+check "guide starts"         "'$BIN' guide '{\"id\":\"g\",\"steps\":[{\"title\":\"One\",\"shapes\":[{\"type\":\"marker\",\"x\":50,\"y\":50,\"number\":1}]},{\"type\":\"rect\",\"x\":10,\"y\":10,\"width\":40,\"height\":40,\"label\":\"Two\"}]}'" '"steps" : 2'
+check "step 1 shown"         "'$BIN' list" 'Step 1\/2: One'
+check "step has Next button" "'$BIN' list" '"task" : true'
+"$BIN" json '{"cmd":"_simulate_click","id":"g.1"}' >/dev/null; sleep 1
+check "advances to step 2"   "'$BIN' list" 'Step 2\/2: Two'
+"$BIN" json '{"cmd":"_simulate_click","id":"g.2"}' >/dev/null; sleep 1.2
+check "guide completes"      "'$BIN' wait id=g timeout=2" '"action" : "completed"'
+"$BIN" guide '[{"type":"marker","x":5,"y":5,"number":1},{"type":"marker","x":5,"y":5,"number":2}]' id=c >/dev/null
+"$BIN" json '{"cmd":"_simulate_click","id":"c.1","action":"dismissed"}' >/dev/null
+check "✕ cancels guide"      "'$BIN' wait id=c timeout=2" '"action" : "cancelled"'
+check "bad step rejected"    "'$BIN' guide '[{\"type\":\"rect\"}]'" 'missing required number'
+
+echo "Windows"
+check "list_windows"         "'$BIN' windows" '"windows"'
+check "unknown window"       "'$BIN' rect window=NoSuchAppXYZ x=1 y=1 width=5 height=5" 'No visible window matches'
+HELPER="$(cd "$(dirname "$0")/.." && pwd)/.build/moving-window"
+if [[ ! -x "$HELPER" ]]; then swiftc -O "$(dirname "$0")/MovingWindow.swift" -o "$HELPER" 2>/dev/null; fi
+if [[ -x "$HELPER" ]]; then
+  "$HELPER" & sleep 1
+  check "anchor to window"   "'$BIN' rect window=moving-window x=10 y=10 width=100 height=50 id=w" '"window" : "moving-window"'
+  B1=$("$BIN" list | grep -A1 '"bounds"' | tail -1 | tr -dc '0-9')
+  sleep 2
+  B2=$("$BIN" list | grep -A1 '"bounds"' | tail -1 | tr -dc '0-9')
+  check "mark follows window" "echo \$((B2 - B1))" '200'
+  sleep 2.5
+  check "hidden when window gone" "'$BIN' list" '"window_visible" : false'
+  wait; "$BIN" clear >/dev/null
+else
+  echo "  - skipped window-follow test (no swiftc)"
+fi
+
 echo "MCP"
 check "initialize"           "mcp" '"serverInfo"'
 check "tools/list"           "mcp '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'" 'wait_for_click'
+check "guide tool listed"    "mcp '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}'" '"name":"guide"'
 check "tool call draws"      "mcp '$(call draw_arrow '{"from_x":1,"from_y":1,"to_x":50,"to_y":50,"id":"m"}')'" '"isError":false'
 check "tool error flagged"   "mcp '$(call draw_rect '{"x":1}')'" '"isError":true'
 check "unknown tool"         "mcp '$(call nope '{}')'" 'Unknown tool'

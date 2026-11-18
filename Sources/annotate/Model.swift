@@ -10,8 +10,8 @@ struct Annotation {
     let uid: Int                 // internal, unique
     let id: String               // caller-visible (may be shared, e.g. display "all")
     let kind: ShapeKind
-    let displayID: CGDirectDisplayID
-    let displayName: String
+    var displayID: CGDirectDisplayID
+    var displayName: String
     var rect: CGRect = .zero     // circle / rect / highlight / spotlight / marker bounds
     var from: CGPoint = .zero    // arrow tail, label anchor
     var to: CGPoint = .zero      // arrow head
@@ -29,6 +29,16 @@ struct Annotation {
     var task = false             // show a clickable "✓ Done" button
     var doneText = "Done"
     var dismissible = true       // show a clickable "✕" button
+    var windowID: CGWindowID?    // anchored to this app window; follows it
+    var windowApp: String?
+    var windowOrigin: CGPoint = .zero  // window's last-seen top-left, CG global
+    var hidden = false           // anchored window is minimized / on another Space
+
+    mutating func shift(dx: CGFloat, dy: CGFloat) {
+        rect = rect.offsetBy(dx: dx, dy: dy)
+        from = CGPoint(x: from.x + dx, y: from.y + dy)
+        to = CGPoint(x: to.x + dx, y: to.y + dy)
+    }
 
     private func r(_ v: CGFloat) -> Double { (Double(v) * 10).rounded() / 10 }
 
@@ -48,6 +58,7 @@ struct Annotation {
         if let t = text { d["text"] = t }
         if let c = caption { d["label"] = c }
         if task { d["task"] = true }
+        if let w = windowApp { d["window"] = w; d["window_visible"] = !hidden }
         if let e = expiresAt { d["expires_in_seconds"] = max(0, Int(e.timeIntervalSinceNow.rounded())) }
         return d
     }
@@ -79,7 +90,11 @@ enum ShapeParser {
             throw AnnotatorError("Unknown shape type '\(typeRaw)'.")
         }
 
-        let screens = try Displays.resolve(s["display"])
+        var window: WindowInfo? = nil
+        if let sel = s["window"], !((sel as? String)?.isEmpty ?? false) {
+            window = try Windows.resolve(sel)
+        }
+        let screens = try window.map { [Windows.screen(containing: $0.bounds)!] } ?? Displays.resolve(s["display"])
         let userID: String
         if let given = str(s, "id"), !given.isEmpty { userID = given }
         else { nextAutoID += 1; userID = "a\(nextAutoID)" }
@@ -101,7 +116,8 @@ enum ShapeParser {
 
         var out: [Annotation] = []
         for screen in screens {
-            let u = UnitScale(units: (s["units"] as? String) ?? "points", screen: screen)
+            let u = UnitScale(units: (s["units"] as? String) ?? "points", screen: screen,
+                              size: window?.bounds.size)
             nextUID += 1
             var a = Annotation(
                 uid: nextUID, id: userID, kind: kind,
@@ -153,6 +169,14 @@ enum ShapeParser {
                 if let n = s["number"] { a.text = "\(n is NSNumber ? String((n as! NSNumber).intValue) : "\(n)")" }
                 if a.text == nil || a.text!.isEmpty { throw AnnotatorError("marker needs \"number\" or \"text\".") }
             }
+            if let w = window {
+                // Coordinates were window-relative: move them into display space.
+                let tl = Windows.topLeft(of: screen)
+                a.shift(dx: w.bounds.minX - tl.x, dy: w.bounds.minY - tl.y)
+                a.windowID = w.id
+                a.windowApp = w.owner
+                a.windowOrigin = w.bounds.origin
+            }
             out.append(a)
         }
         return out
@@ -190,14 +214,15 @@ enum ShapeParser {
 /// Converts caller units to display points.
 struct UnitScale {
     let x: CGFloat, y: CGFloat, r: CGFloat
-    init(units: String, screen: NSScreen) {
+    init(units: String, screen: NSScreen, size: CGSize? = nil) {
+        let area = size ?? screen.frame.size
         switch units.lowercased() {
         case "pixels", "px":
             let s = 1 / screen.backingScaleFactor
             x = s; y = s; r = s
         case "fraction", "fractions", "relative", "percent01":
-            x = screen.frame.width; y = screen.frame.height
-            r = min(screen.frame.width, screen.frame.height)
+            x = area.width; y = area.height
+            r = min(area.width, area.height)
         default:
             x = 1; y = 1; r = 1
         }

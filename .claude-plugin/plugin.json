@@ -1,6 +1,6 @@
 {
   "name": "screen-annotator",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "On-screen pointing for AI agents on macOS: circles, arrows, highlights and numbered steps in a click-through overlay, with clickable Done buttons so the AI can walk you through tasks step by step.",
   "author": {
     "name": "Chris Ihler"

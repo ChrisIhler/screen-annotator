@@ -60,6 +60,14 @@
       "description": "Wait for the user to press Done or dismiss"
     },
     {
+      "name": "guide",
+      "description": "Step-by-step walkthrough that advances when the user presses Next"
+    },
+    {
+      "name": "list_windows",
+      "description": "List app windows to anchor marks to"
+    },
+    {
       "name": "run_tutorial",
       "description": "Interactive first-run walkthrough"
     },

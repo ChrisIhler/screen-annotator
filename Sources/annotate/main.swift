@@ -10,6 +10,8 @@ USAGE
   annotate <shape> key=value ...     Draw a shape (see below)
   annotate clear [display=..] [id=..]  Clear annotations (all by default)
   annotate list                      List annotations on screen
+  annotate windows                   List app windows (for window=…)
+  annotate guide '<json>'            Step-by-step guide that advances on ✓ Next
   annotate wait [id=..] [timeout=120]  Wait for a click on a ✓ Done / ✕ button
   annotate tutorial                  Interactive 1-minute walkthrough (start here)
   annotate demo [display=right]      Draw a sample set for 10 seconds
@@ -27,6 +29,7 @@ SHAPES
 
 COMMON OPTIONS
   display=0|HDR|ultrawide|built-in|left|right|top|bottom|main|mouse|all
+  window=Chrome|front|<window_id>   (coordinates relative to that window; follows it)
   units=points|pixels|fraction   color=red|#FF8800   urgency=urgent|soon|fyi
   label="Action 1"   id=name   line_width=5   duration_seconds=10
   pin_to_current_space=true   clear_first=true
@@ -81,6 +84,17 @@ case "displays", "list_displays":
     send(["cmd": "list_displays"])
 case "list":
     send(["cmd": "list"])
+case "windows", "list_windows":
+    send(["cmd": "list_windows"])
+case "guide":
+    // annotate guide '<json steps array or {"steps":[...], ...}>'
+    guard let raw = rest.first, let d = raw.data(using: .utf8), let obj = try? JSONSerialization.jsonObject(with: d) else {
+        print("usage: annotate guide '{\"steps\":[{\"title\":\"…\",\"shapes\":[…]}]}'"); exit(2)
+    }
+    var req: [String: Any] = (obj as? [String: Any]) ?? ["steps": obj]
+    req.merge(parseKV(rest.dropFirst())) { a, _ in a }
+    req["cmd"] = "guide"
+    send(req)
 case "clear":
     var r = parseKV(rest); r["cmd"] = "clear"; send(r)
 case "quit", "stop":
